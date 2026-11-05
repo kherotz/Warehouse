@@ -1,175 +1,1303 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Warehouse Scan & Storage</title>
-<style>
-:root{--bg:#f4f5f7;--card:#fff;--tx:#14181f;--mut:#667085;--bd:#e2e5ea;--ac:#e8590c;--acx:#fff;--ok:#2b8a3e;--bad:#c92a2a;--chip:#fff4e6;
-box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101318;--card:#1a1f27;--tx:#eef0f3;--mut:#9aa3b2;--bd:#2c333d;--ac:#ff922b;--acx:#1a1205;--ok:#69db7c;--bad:#ff8787;--chip:#3a2a14;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#101318;--card:#1a1f27;--tx:#eef0f3;--mut:#9aa3b2;--bd:#2c333d;--ac:#ff922b;--acx:#1a1205;--ok:#69db7c;--bad:#ff8787;--chip:#3a2a14;color-scheme:dark}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:72px}
-header{padding:14px 16px 6px;display:flex;align-items:center;justify-content:space-between}
-h1{font-size:18px;margin:0;letter-spacing:-.01em}h2{font-size:15px;margin:18px 0 8px}
-main{padding:0 16px 16px;max-width:760px;margin:auto}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));z-index:5}
-nav button{flex:1;background:none;border:0;color:var(--mut);font:600 11px system-ui;padding:6px 0;cursor:pointer;border-radius:8px}
-nav button b{display:block;font-size:18px;font-weight:400}
-nav button.on{color:var(--ac)}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-input,select,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;min-width:0}
-input:focus{outline:2px solid var(--ac);border-color:transparent}
-.grow{flex:1}
-button.btn{font:600 14px system-ui;border:0;border-radius:8px;padding:10px 14px;background:var(--ac);color:var(--acx);cursor:pointer}
-button.btn.g{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
-button.btn.d{background:none;color:var(--bad);border:1px solid var(--bd);padding:6px 10px}
-.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
-.modes button{padding:10px 2px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:600 13px system-ui;cursor:pointer}
-.modes button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
-#scan{width:100%;font-size:18px;padding:14px;border:2px solid var(--ac)}
-.chips{display:grid;gap:8px;margin:12px 0}
-.chip{border:1px dashed var(--bd);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;gap:8px}
-.chip.set{border-style:solid;border-color:var(--ac);background:var(--chip)}
-.chip small{color:var(--mut);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0 12px}
-.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}.stat b{font-size:24px;display:block}.stat span{color:var(--mut);font-size:12px}
-.li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}.li:last-child{border:0}
-.mut{color:var(--mut);font-size:13px}.tag{display:inline-block;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:1px 7px;font-size:12px;margin:2px 4px 0 0}
-.low{color:var(--bad);font-weight:700}.ok{color:var(--ok)}
-.in{color:var(--ok)}.out{color:var(--bad)}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90%;text-align:center}
-#toast.show{opacity:1}
-video{width:100%;border-radius:10px;background:#000;max-height:260px}
-.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
-.label{background:#fff;color:#000;border:1px solid #bbb;border-radius:6px;padding:8px;text-align:center;font-size:12px}
-.label svg{width:100%;height:44px;fill:#000;display:block;margin:4px 0}.label b{font-size:13px}
-@media print{header,nav,.noprint{display:none!important}body{background:#fff;padding:0}.label{break-inside:avoid}}
-</style></head><body>
-<header><h1>📦 Warehouse Scan & Storage</h1><span class="mut" id="clock"></span></header>
-<main id="app"></main>
-<nav id="nav"></nav><div id="toast"></div>
-<script>
-let view='scan',mode='receive',ctx={},unknown=null,q='';
-const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const MODES={receive:['Receive','Put stock into a bin'],pick:['Pick','Take stock out'],move:['Move','Bin to bin'],count:['Count','Set counted qty']};
-const TABS=[['scan','📷','Scan'],['stock','📊','Stock'],['items','🏷️','Items'],['bins','🗄️','Bins'],['log','🕘','History'],['labels','🖨️','Labels']];
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2200)}
-function beep(f){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator();o.frequency.value=f;o.connect(a.destination);o.start();setTimeout(()=>o.stop(),110)}catch(e){}}
-function nav(){$('#nav').innerHTML=TABS.map(t=>`<button class="${view==t[0]?'on':''}" onclick="go('${t[0]}')"><b>${t[1]}</b>${t[2]}</button>`).join('')}
-function go(v){view=v;render()}
-/* ---------- Code 39 barcode ---------- */
-const P={0:'nnnwwnwnn',1:'wnnwnnnnw',2:'nnwwnnnnw',3:'wnwwnnnnn',4:'nnnwwnnnw',5:'wnnwwnnnn',6:'nnwwwnnnn',7:'nnnwnnwnw',8:'wnnwnnwnn',9:'nnwwnnwnn',A:'wnnnnwnnw',B:'nnwnnwnnw',C:'wnwnnwnnn',D:'nnnnwwnnw',E:'wnnnwwnnn',F:'nnwnwwnnn',G:'nnnnnwwnw',H:'wnnnnwwnn',I:'nnwnnwwnn',J:'nnnnwwwnn',K:'wnnnnnnww',L:'nnwnnnnww',M:'wnwnnnnwn',N:'nnnnwnnww',O:'wnnnwnnwn',P:'nnwnwnnwn',Q:'nnnnnnwww',R:'wnnnnnwwn',S:'nnwnnnwwn',T:'nnnnwnwwn',U:'wwnnnnnnw',V:'nwwnnnnnw',W:'wwwnnnnnn',X:'nwnnwnnnw',Y:'wwnnwnnnn',Z:'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn','*':'nwnnwnwnn'};
-function c39(t){let x=0,r='';for(const ch of '*'+t.toUpperCase()+'*'){const p=P[ch];if(!p)continue;for(let i=0;i<9;i++){const w=p[i]=='w'?3:1;if(i%2==0)r+=`<rect x="${x}" width="${w}" height="40"/>`;x+=w}x+=1}return `<svg viewBox="0 0 ${x} 40" preserveAspectRatio="none">${r}</svg>`}
-/* ---------- Scan workflow ---------- */
-function handle(raw){const c=raw.trim().toUpperCase();if(!c)return;
- const it=S.items.find(i=>i.bc.toUpperCase()==c||i.sku.toUpperCase()==c),lc=S.locs.find(l=>l.code==c);
- if(it){ctx.item=it;unknown=null;beep(880)}
- else if(lc){if(mode=='move'&&ctx.loc&&!ctx.loc2)ctx.loc2=lc;else if(mode=='move'&&ctx.loc&&ctx.loc2){ctx.loc=lc;ctx.loc2=null}else ctx.loc=lc;beep(660)}
- else{unknown=c;beep(200);toast('Unknown code: '+c)}
- render()}
-/* camera */
-let stream=null,camOn=false;
-async function cam(){if(camOn){camOn=false;stream&&stream.getTracks().forEach(t=>t.stop());return render()}
- try{if(!('BarcodeDetector' in window))throw 0;stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});camOn=true;render();
-  const v=$('#vid');v.srcObject=stream;await v.play();const d=new BarcodeDetector();let last='';
-  (async function loop(){if(!camOn)return;try{const r=await d.detect(v);if(r[0]&&r[0].rawValue!=last){last=r[0].rawValue;handle(last)}}catch(e){}setTimeout(loop,300)})()
- }catch(e){camOn=false;toast('Camera scanning isn’t available here. Use a handheld scanner or type the code.')}}
-function vScan(){const[ , hint]=MODES[mode],{item,loc,loc2}=ctx;
- const chip=(l,v,s)=>`<div class="chip ${v?'set':''}"><div><small>${l}</small>${v?esc(s):'Waiting for scan…'}</div></div>`;
- const lbl=mode=='move'?['From bin','To bin']:[mode=='pick'?'Pick from bin':'Bin',''];
- const here=item&&(mode=='pick'||mode=='move')?where(item.sku):[];
- return `<div class="modes">${Object.keys(MODES).map(m=>`<button class="${m==mode?'on':''}" onclick="mode='${m}';ctx={};unknown=null;render()">${MODES[m][0]}</button>`).join('')}</div>
- <div class="card"><div class="mut" style="margin-bottom:8px">${hint}. Scan item and bin barcodes in any order.</div>
- <div class="row"><input id="scan" class="grow" placeholder="Scan or type code, press Enter" autocomplete="off" autocapitalize="characters" onkeydown="if(event.key=='Enter'){handle(this.value);this.value=''}"><button class="btn g" onclick="cam()">${camOn?'Stop':'📷'}</button></div>
- ${camOn?'<video id="vid" playsinline muted style="margin-top:10px"></video>':''}
- ${unknown?`<div class="row" style="margin-top:10px"><span class="mut">New code <b>${esc(unknown)}</b></span><input id="nn" class="grow" placeholder="Item name"><button class="btn" onclick="saveUnknown()">Add item</button></div>`:''}
- <div class="chips">${chip('Item',item,item?item.name+' · '+item.sku+' · total '+total(item.sku):'')}${chip(lbl[0],loc,loc?loc.code+(item?' · here: '+qty(item.sku,loc.code):''):'')}${mode=='move'?chip(lbl[1],loc2,loc2&&loc2.code):''}</div>
- ${here.length?`<div class="mut" style="margin-bottom:10px">Stored in: ${here.map(h=>`<span class="tag">${esc(h[0])} × ${h[1]}</span>`).join('')}</div>`:''}
- <div class="row"><input id="qty" type="number" inputmode="numeric" min="0" value="1" style="width:100px" onkeydown="if(event.key=='Enter')confirmOp()"><button class="btn grow" onclick="confirmOp()">Confirm ${MODES[mode][0]}</button><button class="btn g" onclick="ctx={};unknown=null;render()">Clear</button></div></div>
- <div class="mut">Tip: tap Labels to print barcodes for your items and bins, then scan them here.</div>`}
-function vStock(){const its=S.items.filter(i=>(i.sku+i.name).toLowerCase().includes(q.toLowerCase()));
- const units=S.items.reduce((a,i)=>a+total(i.sku),0),used=new Set(Object.keys(S.stock).map(k=>k.split('|')[1])).size,low=S.items.filter(i=>total(i.sku)<i.min).length;
- return `<div class="stats"><div class="stat"><b>${S.items.length}</b><span>Item types</span></div><div class="stat"><b>${units}</b><span>Units in stock</span></div><div class="stat"><b>${used}/${S.locs.length}</b><span>Bins in use</span></div><div class="stat"><b class="${low?'low':''}">${low}</b><span>Below minimum</span></div></div>
- <input id="sq" style="width:100%;margin-bottom:10px" placeholder="Search items…" value="${esc(q)}" oninput="q=this.value;render(true)">
- <div class="card">${its.map(i=>{const t=total(i.sku);return `<div class="li"><div><b>${esc(i.name)}</b><div class="mut">${esc(i.sku)}</div>${where(i.sku).map(w=>`<span class="tag">${esc(w[0])} × ${w[1]}</span>`).join('')||'<span class="mut">No stock</span>'}</div><div style="text-align:right"><b class="${t<i.min?'low':''}" style="font-size:20px">${t}</b><div class="mut">min ${i.min}</div></div></div>`}).join('')||'<div class="mut">No items</div>'}</div>`}
-function vLabels(){return `<div class="row noprint" style="margin-bottom:10px"><button class="btn" onclick="window.print()">Print labels</button><span class="mut">Code 39 barcodes</span></div>
- <h2>Bins</h2><div class="labels">${S.locs.map(l=>`<div class="label"><b>${esc(l.code)}</b>${c39(l.code)}BIN</div>`).join('')}</div>
- <h2>Items</h2><div class="labels">${S.items.map(i=>`<div class="label"><b>${esc(i.name)}</b>${c39(i.bc)}${esc(i.sku)}</div>`).join('')}</div>`}
-setInterval(()=>{$('#clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})},1000);
-/* ===== enterprise layer: shared DB, roles, sites, audit ledger ===== */
-let S={items:[],bins:[],moves:[],stock:{},locs:[],log:[],sites:[]},DB=null,ME=null,US=null,ADMIN=true,LOCAL=true,READY=false,SITE='Main',busy=false;
-const LK='wh_v2',cl=s=>String(s).replace(/[^\w.-]/g,'_');
-const bump=(sku,loc,n,abs)=>{const k=sku+'|'+loc,v=abs?n:(S.stock[k]||0)+n;if(v<=0)delete S.stock[k];else S.stock[k]=v};
-const qty=(sku,loc)=>S.stock[sku+'|'+loc]||0;
-const total=sku=>Object.keys(S.stock).filter(k=>k.startsWith(sku+'|')).reduce((a,k)=>a+S.stock[k],0);
-const where=sku=>Object.keys(S.stock).filter(k=>k.startsWith(sku+'|')).map(k=>[k.split('|')[1],S.stock[k]]);
-function recompute(){S.sites=[...new Set(S.bins.map(b=>b.site))].sort();if(S.sites.length&&!S.sites.includes(SITE))SITE=S.sites[0];
- S.stock={};const L=S.moves.filter(m=>m.site==SITE).sort((a,b)=>a.t-b.t);
- for(const m of L){if(m.type=='receive')bump(m.sku,m.to,m.qty);else if(m.type=='pick')bump(m.sku,m.from,-m.qty);else if(m.type=='move'){bump(m.sku,m.from,-m.qty);bump(m.sku,m.to,m.qty)}else if(m.type=='count')bump(m.sku,m.to,m.qty,1)}
- S.log=L.reverse();S.locs=S.bins.filter(b=>b.site==SITE).sort((a,b)=>a.code<b.code?-1:1);S.items.sort((a,b)=>a.name<b.name?-1:1)}
-function refresh(){READY=true;recompute();if(!camOn)render(true)}
-const localSave=()=>{try{localStorage.setItem(LK,JSON.stringify({items:S.items,bins:S.bins,moves:S.moves}))}catch(e){}};
-function seedLocal(){const t=Date.now(),I=[['SKU-1001','Widget A',20],['SKU-1002','USB-C Cable 1m',50],['SKU-1003','Shipping Box 30cm',30],['SKU-1004','Packing Tape',10]];
- S.items=I.map(([s,n,m])=>({id:s,sku:s,bc:s,name:n,min:m}));S.bins=['DOCK','A-01-01','A-01-02','A-02-01','B-01-01','B-01-02'].map(c=>({id:'Main_'+c,code:c,site:'Main'}));
- S.moves=[['SKU-1001','A-01-01',40],['SKU-1002','A-01-02',120],['SKU-1003','B-01-01',18],['SKU-1004','B-01-02',25]].map(([s,l,q],i)=>({id:'seed'+i,t:t-1e5+i,type:'receive',sku:s,name:S.items.find(x=>x.sku==s).name,to:l,qty:q,site:'Main',by:'local'}))}
-const denied=e=>e&&e.code=='not_granted'?'Your role doesn’t allow that':'Save failed: '+((e&&(e.message||e.code))||'error');
-async function put(col,id,d){if(DB){try{await DB.collection(col).doc(id).set(d);return true}catch(e){toast(denied(e));return false}}
- S[col]=S[col].filter(x=>x.id!=id).concat([{...d,id}]);localSave();refresh();return true}
-async function del(col,id){if(DB){try{await DB.collection(col).doc(id).delete();return true}catch(e){toast(denied(e));return false}}
- S[col]=S[col].filter(x=>x.id!=id);localSave();refresh();return true}
-async function confirmOp(){const n=parseInt($('#qty').value,10),{item,loc,loc2}=ctx;
- if(!item)return toast('Scan an item first');
- if(!loc)return toast(mode=='receive'||mode=='count'?'Scan a bin':'Scan the source bin');
- if(mode=='move'&&!loc2)return toast('Scan the destination bin');
- if(mode!='count'&&!(n>0))return toast('Enter a quantity');
- if(mode=='count'&&!(n>=0))return toast('Enter counted qty');
- const e={t:Date.now(),type:mode,sku:item.sku,name:item.name,qty:n,site:SITE,by:(ME&&ME.id)||'local'};
- if(mode=='receive')e.to=loc.code;
- if(mode=='pick'||mode=='move'){if(qty(item.sku,loc.code)<n)return toast('Only '+qty(item.sku,loc.code)+' in '+loc.code);e.from=loc.code}
- if(mode=='move'){if(loc.code==loc2.code)return toast('Same bin');e.to=loc2.code}
- if(mode=='count'){e.to=loc.code;e.diff=n-qty(item.sku,loc.code)}
- if(busy)return;busy=true;const ok=await put('moves','m'+e.t+Math.random().toString(36).slice(2,6),e);busy=false;
- if(ok){ctx={};beep(1100);toast('✓ '+MODES[mode][0]+' recorded');render()}}
-async function saveUnknown(){if(!ADMIN)return toast('Ask an admin to add this item');const nm=$('#nn').value.trim()||unknown,it={sku:unknown,name:nm,bc:unknown,min:0};
- if(await put('items',cl(unknown),it)){ctx.item={...it,id:cl(unknown)};unknown=null;render()}}
-function setSite(v){SITE=v;try{localStorage.setItem('wh_site',v)}catch(e){}ctx={};refresh()}
-function bar(){const ss=S.sites.length?S.sites:[SITE];return `<div class="row" style="margin-bottom:12px"><select onchange="setSite(this.value)">${ss.map(s=>`<option ${s==SITE?'selected':''}>${esc(s)}</option>`).join('')}</select><span class="tag">${ADMIN?'Admin':'Operator'}</span><span class="tag">${LOCAL?'Local demo':'● Live · shared'}</span></div>`}
-function vItems(){return (ADMIN?`<div class="card"><b>Add item</b><div class="row" style="margin-top:8px"><input id="a1" placeholder="SKU / barcode" class="grow"><input id="a2" placeholder="Name" class="grow"><input id="a3" type="number" placeholder="Min" style="width:80px"><button class="btn" onclick="addItem()">Add</button></div>
- <div class="mut" style="margin:12px 0 6px">Bulk import, one per line: sku,name,min</div><textarea id="bi" rows="3" style="width:100%"></textarea><button class="btn g" style="margin-top:6px" onclick="bulkItems()">Import</button></div>`:'<div class="mut" style="margin-bottom:10px">Read-only: an admin manages the item catalogue.</div>')
- +`<div class="card">${S.items.map(i=>`<div class="li"><div><b>${esc(i.name)}</b><div class="mut">${esc(i.sku)} · min ${i.min}</div></div>${ADMIN?`<button class="btn d" onclick="delItem('${esc(i.id)}')">Delete</button>`:''}</div>`).join('')||'<div class="mut">No items</div>'}</div>`}
-async function addItem(){const s=$('#a1').value.trim().toUpperCase(),n=$('#a2').value.trim();if(!s||!n)return toast('SKU and name required');if(S.items.some(i=>i.sku==s))return toast('SKU exists');await put('items',cl(s),{sku:s,name:n,bc:s,min:parseInt($('#a3').value)||0});render()}
-async function bulkItems(){let c=0;for(const l of $('#bi').value.split('\n')){const[s,n,m]=l.split(',').map(x=>x.trim());if(!s||!n)continue;const u=s.toUpperCase();await put('items',cl(u),{sku:u,name:n,bc:u,min:parseInt(m)||0});c++}toast(c+' items imported');render()}
-async function delItem(id){const i=S.items.find(x=>x.id==id);if(S.moves.some(m=>m.sku==i.sku))return toast('Has history, so it can’t be deleted (audit trail)');await del('items',id);render()}
-function vBins(){return (ADMIN?`<div class="card"><b>Add bin</b><div class="row" style="margin-top:8px"><input id="b1" placeholder="Code e.g. C-01-01" class="grow"><input id="b2" value="${esc(SITE)}" placeholder="Site" style="width:120px"><button class="btn" onclick="addBin()">Add</button></div>
- <div class="mut" style="margin:12px 0 6px">Bulk import for the site above, one code per line. A new site name creates a new warehouse.</div><textarea id="bb" rows="3" style="width:100%"></textarea><button class="btn g" style="margin-top:6px" onclick="bulkBins()">Import</button></div>`:'<div class="mut" style="margin-bottom:10px">Read-only: an admin manages bins.</div>')
- +`<div class="card">${S.locs.map(l=>{const c=Object.keys(S.stock).filter(k=>k.endsWith('|'+l.code));return `<div class="li"><div><b>${esc(l.code)}</b><div class="mut">${c.length?c.map(k=>esc(k.split('|')[0])+' × '+S.stock[k]).join(', '):'Empty'}</div></div>${ADMIN?`<button class="btn d" onclick="delBin('${esc(l.id)}')">Delete</button>`:''}</div>`}).join('')||'<div class="mut">No bins at this site</div>'}</div>`}
-async function addBins(list){const s=($('#b2')?$('#b2').value.trim():'')||SITE;let c=0;for(const x of list){const u=x.trim().toUpperCase();if(!u||S.bins.some(b=>b.site==s&&b.code==u))continue;await put('bins',cl(s+'_'+u),{code:u,site:s});c++}toast(c+' bins added');if(s!=SITE)setSite(s);else render()}
-const addBin=()=>addBins([$('#b1').value]),bulkBins=()=>addBins($('#bb').value.split('\n'));
-async function delBin(id){const b=S.bins.find(x=>x.id==id);if(S.moves.some(m=>m.site==b.site&&(m.to==b.code||m.from==b.code)))return toast('Bin has history and can’t be deleted');await del('bins',id);render()}
-function vLog(){return `<div class="row" style="margin-bottom:10px"><button class="btn g" onclick="exportCsv('stock')">Export stock CSV</button><button class="btn g" onclick="exportCsv('history')">Export history CSV</button></div>
- <div class="card">${S.log.slice(0,200).map(e=>`<div class="li"><div><b class="${e.type=='pick'?'out':e.type=='receive'?'in':''}">${MODES[e.type][0]}</b> ${esc(e.name)}<div class="mut">${esc(e.sku)} · ${e.from?esc(e.from)+' → ':''}${e.to?esc(e.to):''} · ${new Date(e.t).toLocaleString()} · <span data-u="${esc(e.by||'')}"></span></div></div><b>${e.type=='count'?'='+e.qty+(e.diff?' ('+(e.diff>0?'+':'')+e.diff+')':''):e.qty}</b></div>`).join('')||'<div class="mut">No activity yet</div>'}</div>
- ${LOCAL?'<button class="btn d" onclick="seedLocal();localSave();refresh()">Reset demo data</button>':'<div class="mut">Every action is recorded with the user and time. Stock is calculated from this ledger.</div>'}`}
-async function names(ids){const o={};ids=ids.filter(x=>x&&x!='local');try{if(US&&ids.length){const p=await US.profiles(ids);for(const i of ids)o[i]=(p[i]&&p[i].name)||'Team member'}}catch(e){}return o}
-async function fillNames(){const els=[...document.querySelectorAll('[data-u]')];if(!els.length)return;const m=await names([...new Set(els.map(e=>e.dataset.u))]);els.forEach(e=>e.textContent=e.dataset.u=='local'?'Local user':(m[e.dataset.u]||''))}
-const csv=r=>r.map(x=>x.map(v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(',')).join('\n');
-async function exportCsv(kind){let dl=null;try{dl=window.claude&&await claude.use('downloads')}catch(e){}if(!dl)return toast('Downloads aren’t available here');
- let rows;if(kind=='stock')rows=[['Site','SKU','Item','Bin','Qty'],...Object.keys(S.stock).sort().map(k=>{const[s,l]=k.split('|'),i=S.items.find(x=>x.sku==s)||{};return[SITE,s,i.name||'',l,S.stock[k]]})];
- else{const n=await names([...new Set(S.log.map(m=>m.by))]);rows=[['Time','Site','Type','SKU','Item','From','To','Qty','User'],...S.log.map(m=>[new Date(m.t).toISOString(),m.site,m.type,m.sku,m.name,m.from||'',m.to||'',m.qty,n[m.by]||m.by||''])]}
- try{await dl.save({filename:kind+'-'+SITE+'.csv',data:csv(rows)})}catch(e){if(!e||e.code!='declined')toast('Export failed')}}
-function render(keep){nav();if(!READY){$('#app').innerHTML='<div class="mut" style="padding:24px 0">Connecting…</div>';return}
- const V={scan:vScan,stock:vStock,items:vItems,bins:vBins,log:vLog,labels:vLabels},a=document.activeElement,id=a&&a.id,pos=a&&a.selectionStart,qv=($('#qty')||{}).value,sv=($('#scan')||{}).value;
- $('#app').innerHTML=bar()+V[view]();
- if(qv&&$('#qty'))$('#qty').value=qv;if(sv&&$('#scan'))$('#scan').value=sv;
- if(keep&&id&&$('#'+id)){const e=$('#'+id);e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}
- else if(view=='scan'&&!unknown&&!camOn){const s=$('#scan');s&&s.focus({preventScroll:true})}
- fillNames()}
-async function boot(){try{const u=window.claude&&await claude.use('user');if(u){US=u;ME=await u.me();ADMIN=await u.canEdit()}}catch(e){}
- let db=null;try{db=window.claude&&await claude.use('db')}catch(e){}
- try{SITE=localStorage.getItem('wh_site')||SITE}catch(e){}
- if(db){DB=db;LOCAL=false;['items','bins','moves'].forEach(c=>DB.collection(c).onSnapshot(s=>{S[c]=s.docs.map(d=>({...d.data(),id:d.id}));refresh()},e=>toast('Sync error: '+((e&&e.code)||''))))}
- else{try{const j=JSON.parse(localStorage.getItem(LK));if(j&&j.items)Object.assign(S,j);else seedLocal()}catch(e){seedLocal()}}
- refresh()}
-render();boot();
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartLogix - Warehouse Storage & Scanning Suite</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- html5-qrcode for barcode / QR video capture -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            },
+            slate: {
+              850: '#151e2e',
+              900: '#0f172a',
+              950: '#080d1a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbar for warehouse consoles */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.03); }
+    }
+    .slot-highlight {
+      animation: pulse-subtle 1.2s infinite ease-in-out;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 lg:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+        <i class="ph-bold ph-warehouse text-2xl"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="font-bold text-lg text-white tracking-wide">SmartLogix WMS</h1>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Scanner
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Hub DC-04 • Zone Inventory & Barcode Pipeline</p>
+      </div>
+    </div>
+
+    <!-- Active Mode Selector -->
+    <div class="flex items-center bg-slate-850 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+      <button onclick="setWorkflowMode('putaway')" id="btn-mode-putaway" class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 bg-blue-600 text-white shadow">
+        <i class="ph-bold ph-arrow-down-left"></i> Putaway
+      </button>
+      <button onclick="setWorkflowMode('picking')" id="btn-mode-picking" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <i class="ph-bold ph-arrow-up-right"></i> Picking
+      </button>
+      <button onclick="setWorkflowMode('cycle_count')" id="btn-mode-cycle_count" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <i class="ph-bold ph-scan"></i> Cycle Count
+      </button>
+    </div>
+
+    <!-- Operator & Audio Status -->
+    <div class="flex items-center space-x-3 text-sm">
+      <button onclick="toggleSound()" id="sound-btn" class="p-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-750 text-slate-300 transition" title="Toggle Scan Audio Beeper">
+        <i id="sound-icon" class="ph-fill ph-speaker-high text-emerald-400 text-lg"></i>
+      </button>
+      <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800">
+        <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-200">
+          OP
+        </div>
+        <div class="text-left leading-tight">
+          <div class="text-xs font-medium text-slate-200">Operator #842</div>
+          <div class="text-[10px] text-slate-400">Bay Supervisor</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- QUICK STATS BAR -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 px-4 lg:px-6 py-4 bg-slate-900/60 border-b border-slate-800/80">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-400 font-medium">Total Stored Units</p>
+        <p id="stat-total-units" class="text-xl font-bold text-white mt-1">2,840</p>
+        <span class="text-[10px] text-emerald-400 flex items-center gap-0.5 mt-0.5">
+          <i class="ph ph-arrow-up-right"></i> +32 today
+        </span>
+      </div>
+      <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
+        <i class="ph ph-package"></i>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-400 font-medium">Slot Utilization</p>
+        <p id="stat-utilization" class="text-xl font-bold text-white mt-1">68.4%</p>
+        <div class="w-24 bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+          <div id="stat-utilization-bar" class="bg-blue-500 h-full rounded-full" style="width: 68%;"></div>
+        </div>
+      </div>
+      <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+        <i class="ph ph-grid-four"></i>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-400 font-medium">Pending Inbound</p>
+        <p id="stat-pending-inbound" class="text-xl font-bold text-amber-400 mt-1">14 Items</p>
+        <span class="text-[10px] text-amber-300">Dock Stage A ready</span>
+      </div>
+      <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+        <i class="ph ph-truck"></i>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-400 font-medium">Active Pick Orders</p>
+        <p id="stat-active-picks" class="text-xl font-bold text-purple-400 mt-1">4 Orders</p>
+        <span class="text-[10px] text-purple-300">2 priority rush</span>
+      </div>
+      <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+        <i class="ph ph-shopping-cart"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN DUAL-PANE WORKSPACE -->
+  <main class="flex-1 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1700px] w-full mx-auto">
+    
+    <!-- LEFT PANEL: SCANNER ENGINE & WORKFLOW PROMPTER (Cols 4) -->
+    <div class="lg:col-span-4 flex flex-col space-y-5">
+
+      <!-- Scanner Command Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div class="p-4 border-b border-slate-800 bg-slate-850 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="p-2 rounded-lg bg-blue-600/20 text-blue-400">
+              <i class="ph-bold ph-barcode text-lg"></i>
+            </span>
+            <div>
+              <h2 class="font-bold text-sm text-white">Scanner Terminal</h2>
+              <p class="text-[11px] text-slate-400" id="scanner-status-text">Ready for SKU or Location barcode</p>
+            </div>
+          </div>
+          <button id="toggle-camera-btn" onclick="toggleCameraScanner()" class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 transition">
+            <i class="ph ph-camera"></i> <span id="camera-btn-text">Open Cam</span>
+          </button>
+        </div>
+
+        <div class="p-4 flex flex-col space-y-4">
+          <!-- Real Camera Viewport (collapsible) -->
+          <div id="camera-reader-wrapper" class="hidden overflow-hidden rounded-xl border-2 border-dashed border-blue-500/40 bg-black relative">
+            <div id="interactive-reader" class="w-full aspect-video"></div>
+            <div class="absolute bottom-2 left-2 right-2 bg-slate-900/90 text-[11px] p-2 rounded text-center text-slate-300 backdrop-blur pointer-events-none">
+              Align Code in viewfinder
+            </div>
+          </div>
+
+          <!-- Dynamic Workflow Step Banner -->
+          <div id="workflow-guidance-card" class="rounded-xl border p-3.5 bg-blue-950/40 border-blue-500/30 transition-all">
+            <div class="flex items-start gap-2.5">
+              <span id="workflow-step-icon" class="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                1
+              </span>
+              <div>
+                <h3 id="workflow-step-title" class="text-xs font-bold uppercase tracking-wider text-blue-300">Step 1: Scan Inbound Item</h3>
+                <p id="workflow-step-desc" class="text-xs text-slate-300 mt-0.5">
+                  Scan an item barcode (SKU) to initiate intelligent rack allocation.
+                </p>
+              </div>
+            </div>
+
+            <!-- Contextual Stage Details (e.g. Scanned item waiting for bin) -->
+            <div id="staged-item-preview" class="hidden mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+              <div class="flex items-center space-x-2">
+                <div class="w-7 h-7 rounded bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold">
+                  <i class="ph ph-box-arrow-up"></i>
+                </div>
+                <div>
+                  <p id="staged-sku-name" class="font-bold text-white leading-tight">SKU-XXXX</p>
+                  <p id="staged-sku-desc" class="text-[10px] text-slate-400">Waiting for destination bin</p>
+                </div>
+              </div>
+              <span id="staged-suggested-slot" class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                Target: A-04
+              </span>
+            </div>
+          </div>
+
+          <!-- Manual / Barcode input field -->
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Manual / Handheld Scanner Input</label>
+            <div class="relative">
+              <input type="text" id="manual-scan-input" placeholder="Type or scan code then press Enter..." 
+                     class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono pr-10"
+                     onkeydown="handleManualKey(event)">
+              <button onclick="processEnteredBarcode()" class="absolute right-2 top-2 p-1 text-slate-400 hover:text-white rounded">
+                <i class="ph-bold ph-arrow-right text-base"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Simulate Scan Buttons (For seamless demo testing) -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-medium text-slate-400">Quick Test Barcode Simulator</span>
+              <span class="text-[10px] text-slate-500">Instant Click-to-Scan</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <!-- Item SKU presets -->
+              <button onclick="simulateScan('SKU-1049')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-left hover:border-blue-500 transition flex flex-col group">
+                <span class="font-mono font-bold text-blue-400 group-hover:text-blue-300">SKU-1049</span>
+                <span class="text-[10px] text-slate-400 truncate">Core Wireless Sensor</span>
+              </button>
+              <button onclick="simulateScan('SKU-8821')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-left hover:border-blue-500 transition flex flex-col group">
+                <span class="font-mono font-bold text-blue-400 group-hover:text-blue-300">SKU-8821</span>
+                <span class="text-[10px] text-slate-400 truncate">Industrial Drill Bit Set</span>
+              </button>
+              <button onclick="simulateScan('SKU-3012')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-left hover:border-blue-500 transition flex flex-col group">
+                <span class="font-mono font-bold text-blue-400 group-hover:text-blue-300">SKU-3012</span>
+                <span class="text-[10px] text-slate-400 truncate">Reflective Safety Vest</span>
+              </button>
+              <button onclick="simulateScan('SKU-5504')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-left hover:border-blue-500 transition flex flex-col group">
+                <span class="font-mono font-bold text-blue-400 group-hover:text-blue-300">SKU-5504</span>
+                <span class="text-[10px] text-slate-400 truncate">Thermal Bio-Vial (Cold)</span>
+              </button>
+            </div>
+
+            <!-- Bin Location Presets -->
+            <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[11px] font-mono">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-sans">Simulate Bin:</span>
+              <button onclick="simulateScan('A-01')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-300">A-01</button>
+              <button onclick="simulateScan('A-04')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-300">A-04</button>
+              <button onclick="simulateScan('B-02')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-300">B-02</button>
+              <button onclick="simulateScan('C-01')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-300">C-01</button>
+            </div>
+          </div>
+
+          <!-- Alert / Feedback Message Container -->
+          <div id="scan-feedback" class="hidden p-3 rounded-xl border text-xs font-medium flex items-center gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Active Pick Order Mini-Card (Visible in Pick Mode) -->
+      <div id="pick-order-panel" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Current Picking Order: #ORD-992</h3>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold">Priority</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-2">Item requested by dispatch:</p>
+        <div class="p-2.5 rounded-lg bg-slate-850 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-sm text-white">SKU-1049</div>
+            <div class="text-xs text-slate-400">Core Wireless Sensor (Qty: 2)</div>
+          </div>
+          <button onclick="highlightSlotForPick('A-01')" class="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1 transition">
+            <i class="ph ph-map-pin"></i> Locate Bin
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Tips Box -->
+      <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3.5 text-xs text-slate-400 space-y-1.5">
+        <div class="flex items-center gap-1.5 font-semibold text-slate-300">
+          <i class="ph-bold ph-lightbulb text-amber-400 text-sm"></i> Workflow Guide
+        </div>
+        <p>• <b>Putaway:</b> Click SKU preset (or scan code), system recommends best slot, then scan bin code.</p>
+        <p>• <b>Picking:</b> Click an occupied slot on the map or scan SKU to guide retrieval.</p>
+        <p>• <b>Cycle Count:</b> Scan any bin to run audit verification and log discrepancies.</p>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL: INTERACTIVE WAREHOUSE FLOOR MAP & DETAILS (Cols 8) -->
+    <div class="lg:col-span-8 flex flex-col space-y-5">
+      
+      <!-- Interactive Grid / Storage Map Visualizer -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <!-- Floor Header with Zone Filter & Legend -->
+        <div class="p-4 border-b border-slate-800 bg-slate-850 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center space-x-2">
+            <i class="ph-bold ph-squares-four text-blue-500 text-xl"></i>
+            <div>
+              <h2 class="font-bold text-sm text-white">Warehouse Floor Spatial Layout</h2>
+              <p class="text-[11px] text-slate-400">Interactive Bay & Rack Visualizer</p>
+            </div>
+          </div>
+
+          <!-- Zone Pills -->
+          <div class="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+            <button onclick="filterWarehouseZone('ALL')" id="zone-pill-ALL" class="px-2.5 py-1 rounded-lg font-medium bg-blue-600 text-white">All Zones</button>
+            <button onclick="filterWarehouseZone('A')" id="zone-pill-A" class="px-2.5 py-1 rounded-lg font-medium text-slate-400 hover:text-white">Zone A (Racks)</button>
+            <button onclick="filterWarehouseZone('B')" id="zone-pill-B" class="px-2.5 py-1 rounded-lg font-medium text-slate-400 hover:text-white">Zone B (Shelves)</button>
+            <button onclick="filterWarehouseZone('C')" id="zone-pill-C" class="px-2.5 py-1 rounded-lg font-medium text-slate-400 hover:text-white">Zone C (Cold)</button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-900/60 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+          <div class="flex items-center space-x-4">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available (&lt;50%)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Partial (50-85%)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Full (&gt;85%)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Cold Room</span>
+          </div>
+          <div class="text-[10px] text-slate-500 italic">Click on any bin to inspect or perform action</div>
+        </div>
+
+        <!-- Visual Slot Grid -->
+        <div class="p-5 overflow-x-auto">
+          <div id="warehouse-grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-w-[500px]">
+            <!-- Slots dynamically rendered via JavaScript -->
+          </div>
+        </div>
+
+        <!-- Selected Slot Quick Inspection Drawer -->
+        <div id="slot-drawer" class="border-t border-slate-800 bg-slate-850 p-4 transition-all hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+              <div id="drawer-slot-badge" class="w-12 h-12 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 font-mono font-black text-lg flex items-center justify-center">
+                A-01
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h3 id="drawer-slot-title" class="font-bold text-white text-sm">Zone A - Heavy Pallet Rack 01</h3>
+                  <span id="drawer-slot-status" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium">Partial</span>
+                </div>
+                <p id="drawer-slot-sku" class="text-xs text-slate-300 mt-0.5 font-mono">SKU-1049 | Core Wireless Sensor</p>
+              </div>
+            </div>
+
+            <!-- Drawer actions -->
+            <div class="flex items-center space-x-2">
+              <button onclick="triggerQuickPutawayFromDrawer()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="ph-bold ph-plus"></i> Putaway Here
+              </button>
+              <button onclick="triggerQuickPickFromDrawer()" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="ph-bold ph-hand-palm"></i> Pick from Bin
+              </button>
+              <button onclick="closeSlotDrawer()" class="p-1.5 text-slate-400 hover:text-white rounded-lg">
+                <i class="ph ph-x text-lg"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Capacity Bar in drawer -->
+          <div class="mt-3 grid grid-cols-3 gap-3 text-xs pt-3 border-t border-slate-800">
+            <div>
+              <span class="text-slate-400">Current Qty:</span>
+              <span id="drawer-slot-qty" class="font-bold text-white ml-1">32 / 50</span>
+            </div>
+            <div>
+              <span class="text-slate-400">Category:</span>
+              <span id="drawer-slot-cat" class="font-bold text-white ml-1">Electronics</span>
+            </div>
+            <div>
+              <span class="text-slate-400">Barcode ID:</span>
+              <span id="drawer-slot-code" class="font-mono text-blue-400 ml-1">LOC-A01</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTORY MANAGEMENT & AUDIT LOG TABS -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col flex-1">
+        <div class="flex items-center justify-between border-b border-slate-800 px-4 pt-3">
+          <div class="flex space-x-2">
+            <button onclick="switchTab('inventory')" id="tab-btn-inventory" class="pb-2.5 px-3 text-xs font-bold border-b-2 border-blue-500 text-white flex items-center gap-1.5">
+              <i class="ph ph-archive-box"></i> Inventory Master
+            </button>
+            <button onclick="switchTab('audit')" id="tab-btn-audit" class="pb-2.5 px-3 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5">
+              <i class="ph ph-clock-counter-clockwise"></i> Live Scan Audit Trail
+            </button>
+          </div>
+          <div class="pb-2">
+            <input type="text" id="table-search" placeholder="Filter SKU, bin, or tag..." oninput="handleTableSearch(this.value)" class="bg-slate-950 border border-slate-800 rounded-lg text-xs px-2.5 py-1 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <!-- Inventory Master Tab Content -->
+        <div id="tab-content-inventory" class="p-0 overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-850/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                <th class="py-2.5 px-4">SKU / Item</th>
+                <th class="py-2.5 px-3">Location</th>
+                <th class="py-2.5 px-3">Category</th>
+                <th class="py-2.5 px-3">Stored Qty</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body" class="divide-y divide-slate-800/60 font-medium">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Audit Log Tab Content -->
+        <div id="tab-content-audit" class="hidden p-0 overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-850/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                <th class="py-2.5 px-4">Timestamp</th>
+                <th class="py-2.5 px-3">Action</th>
+                <th class="py-2.5 px-3">Item SKU</th>
+                <th class="py-2.5 px-3">Slot Bin</th>
+                <th class="py-2.5 px-3">Qty</th>
+                <th class="py-2.5 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table-body" class="divide-y divide-slate-800/60 font-mono text-[11px]">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Cycle Count Verification Modal -->
+  <div id="cycle-count-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="ph-bold ph-scales text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-white">Physical Inventory Verification</h3>
+            <p class="text-[11px] text-slate-400">Bin: <span id="audit-modal-bin" class="font-mono text-blue-400 font-bold">A-01</span></p>
+          </div>
+        </div>
+        <button onclick="closeAuditModal()" class="text-slate-400 hover:text-white p-1 rounded">
+          <i class="ph ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-3 text-xs">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+          <div class="text-slate-400">Registered SKU:</div>
+          <div id="audit-modal-sku" class="text-sm font-bold text-white font-mono">SKU-1049 (Core Wireless Sensor)</div>
+          <div class="flex justify-between pt-1 text-slate-400">
+            <span>System Count:</span>
+            <span id="audit-modal-system-qty" class="font-bold text-slate-200">32 Units</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Actual Physical Counted Units</label>
+          <input type="number" id="audit-modal-actual-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500 focus:outline-none" min="0">
+        </div>
+
+        <div id="audit-modal-variance-warning" class="hidden p-2.5 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs"></div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
+        <button onclick="closeAuditModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold text-xs">
+          Cancel
+        </button>
+        <button onclick="commitCycleCount()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs">
+          Verify & Reconcile
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    /* =====================================================================
+       1. DATA STORAGE & MODELS
+       ===================================================================== */
+    const SKU_DATABASE = {
+      'SKU-1049': { name: 'Core Wireless Sensor', category: 'Electronics', preferredZone: 'A', defaultPack: 5 },
+      'SKU-8821': { name: 'Industrial Drill Bit Set', category: 'Tools', preferredZone: 'B', defaultPack: 8 },
+      'SKU-3012': { name: 'Reflective Safety Vest', category: 'Apparel', preferredZone: 'B', defaultPack: 10 },
+      'SKU-5504': { name: 'Thermal Bio-Vial', category: 'Cold Storage', preferredZone: 'C', defaultPack: 4 },
+      'SKU-9900': { name: 'Heavy Steel Flange', category: 'Heavy Industrial', preferredZone: 'A', defaultPack: 2 }
+    };
+
+    let warehouseBins = [
+      // Zone A (Heavy Pallet Racks)
+      { id: 'A-01', code: 'LOC-A01', zone: 'A', zoneName: 'Pallet Racks', sku: 'SKU-1049', qty: 32, maxQty: 50, reserved: 0 },
+      { id: 'A-02', code: 'LOC-A02', zone: 'A', zoneName: 'Pallet Racks', sku: 'SKU-9900', qty: 45, maxQty: 50, reserved: 0 },
+      { id: 'A-03', code: 'LOC-A03', zone: 'A', zoneName: 'Pallet Racks', sku: null, qty: 0, maxQty: 50, reserved: 0 },
+      { id: 'A-04', code: 'LOC-A04', zone: 'A', zoneName: 'Pallet Racks', sku: null, qty: 0, maxQty: 50, reserved: 0 },
+
+      // Zone B (Shelving)
+      { id: 'B-01', code: 'LOC-B01', zone: 'B', zoneName: 'Standard Shelving', sku: 'SKU-8821', qty: 28, maxQty: 40, reserved: 0 },
+      { id: 'B-02', code: 'LOC-B02', zone: 'B', zoneName: 'Standard Shelving', sku: 'SKU-3012', qty: 38, maxQty: 40, reserved: 0 },
+      { id: 'B-03', code: 'LOC-B03', zone: 'B', zoneName: 'Standard Shelving', sku: null, qty: 0, maxQty: 40, reserved: 0 },
+      { id: 'B-04', code: 'LOC-B04', zone: 'B', zoneName: 'Standard Shelving', sku: 'SKU-8821', qty: 15, maxQty: 40, reserved: 0 },
+
+      // Zone C (Cold Storage)
+      { id: 'C-01', code: 'LOC-C01', zone: 'C', zoneName: 'Cold Bio-Chamber', sku: 'SKU-5504', qty: 20, maxQty: 25, reserved: 0 },
+      { id: 'C-02', code: 'LOC-C02', zone: 'C', zoneName: 'Cold Bio-Chamber', sku: null, qty: 0, maxQty: 25, reserved: 0 },
+      { id: 'C-03', code: 'LOC-C03', zone: 'C', zoneName: 'Cold Bio-Chamber', sku: null, qty: 0, maxQty: 25, reserved: 0 },
+      { id: 'C-04', code: 'LOC-C04', zone: 'C', zoneName: 'Cold Bio-Chamber', sku: 'SKU-5504', qty: 24, maxQty: 25, reserved: 0 }
+    ];
+
+    let auditLogs = [
+      { timestamp: '10:14:22', action: 'PUTAWAY', sku: 'SKU-1049', bin: 'A-01', qty: '+5', status: 'COMPLETED' },
+      { timestamp: '09:42:05', action: 'PICK', sku: 'SKU-3012', bin: 'B-02', qty: '-2', status: 'COMPLETED' },
+      { timestamp: '08:15:30', action: 'CYCLE_COUNT', sku: 'SKU-5504', bin: 'C-01', qty: 'VERIFIED', status: 'MATCH' }
+    ];
+
+    /* Workflow State */
+    let currentWorkflow = 'putaway'; // 'putaway' | 'picking' | 'cycle_count'
+    let currentStep = 1;             // 1: Scan item, 2: Scan destination bin
+    let stagedPutawayItem = null;    // { sku, name, suggestedBinId, qtyToAdd }
+    let stagedPickItem = null;       // { sku, binId, qtyToPick }
+    let activeFilterZone = 'ALL';
+    let selectedSlotId = null;
+    let soundEnabled = true;
+    let html5QrScannerInstance = null;
+    let cameraActive = false;
+
+    /* =====================================================================
+       2. WEB AUDIO API SYNTHESIZER (No external mp3 needed)
+       ===================================================================== */
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playBeep(type = 'success') {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+
+        if (type === 'success') {
+          // Double high-beep confirmation
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1400, now);
+          osc.frequency.setValueAtTime(1900, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } else if (type === 'recommend') {
+          // Chime on slot allocation
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(800, now);
+          osc.frequency.setValueAtTime(1200, now + 0.09);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else {
+          // Low buzz for warning / invalid scan
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.setValueAtTime(180, now + 0.1);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }
+      } catch (e) {
+        console.warn('Audio playback not supported without interaction', e);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      if (soundEnabled) {
+        icon.className = 'ph-fill ph-speaker-high text-emerald-400 text-lg';
+        showFeedback('Audio beeper enabled', 'info');
+      } else {
+        icon.className = 'ph-fill ph-speaker-slash text-slate-500 text-lg';
+        showFeedback('Audio beeper muted', 'info');
+      }
+    }
+
+    /* =====================================================================
+       3. WORKFLOW CONTROLLER (PUTAWAY, PICKING, AUDIT)
+       ===================================================================== */
+    function setWorkflowMode(mode) {
+      currentWorkflow = mode;
+      currentStep = 1;
+      stagedPutawayItem = null;
+      stagedPickItem = null;
+
+      // Update Top Buttons
+      ['putaway', 'picking', 'cycle_count'].forEach(m => {
+        const btn = document.getElementById(`btn-mode-putaway`.replace('putaway', m));
+        if (m === mode) {
+          btn.className = 'px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 bg-blue-600 text-white shadow font-semibold';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
+        }
+      });
+
+      // Update Pick Order card visibility
+      const pickPanel = document.getElementById('pick-order-panel');
+      if (mode === 'picking') {
+        pickPanel.classList.remove('hidden');
+      } else {
+        pickPanel.classList.add('hidden');
+      }
+
+      // Reset guidance card
+      updateGuidanceCard();
+      renderWarehouseGrid();
+      closeSlotDrawer();
+    }
+
+    function updateGuidanceCard() {
+      const title = document.getElementById('workflow-step-title');
+      const desc = document.getElementById('workflow-step-desc');
+      const icon = document.getElementById('workflow-step-icon');
+      const preview = document.getElementById('staged-item-preview');
+      const card = document.getElementById('workflow-guidance-card');
+
+      if (currentWorkflow === 'putaway') {
+        if (currentStep === 1) {
+          card.className = 'rounded-xl border p-3.5 bg-blue-950/40 border-blue-500/30 transition-all';
+          icon.innerText = '1';
+          icon.className = 'w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5';
+          title.innerText = 'Step 1: Scan Inbound Item';
+          title.className = 'text-xs font-bold uppercase tracking-wider text-blue-300';
+          desc.innerText = 'Scan an item barcode (e.g. SKU-1049) to compute best bay assignment.';
+          preview.classList.add('hidden');
+        } else {
+          card.className = 'rounded-xl border p-3.5 bg-emerald-950/30 border-emerald-500/40 transition-all';
+          icon.innerText = '2';
+          icon.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5';
+          title.innerText = 'Step 2: Confirm Destination Shelf';
+          title.className = 'text-xs font-bold uppercase tracking-wider text-emerald-300';
+          desc.innerText = `Take package to slot ${stagedPutawayItem.suggestedBinId}. Scan shelf barcode to finalize putaway.`;
+          preview.classList.remove('hidden');
+          document.getElementById('staged-sku-name').innerText = stagedPutawayItem.sku;
+          document.getElementById('staged-sku-desc').innerText = stagedPutawayItem.name;
+          document.getElementById('staged-suggested-slot').innerText = `Target: ${stagedPutawayItem.suggestedBinId}`;
+        }
+      } else if (currentWorkflow === 'picking') {
+        card.className = 'rounded-xl border p-3.5 bg-purple-950/40 border-purple-500/30 transition-all';
+        icon.innerText = 'P';
+        icon.className = 'w-6 h-6 rounded-full bg-purple-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5';
+        title.innerText = 'Picking Pipeline';
+        title.className = 'text-xs font-bold uppercase tracking-wider text-purple-300';
+        desc.innerText = 'Scan SKU or target shelf location to register item removal.';
+        preview.classList.add('hidden');
+      } else if (currentWorkflow === 'cycle_count') {
+        card.className = 'rounded-xl border p-3.5 bg-amber-950/40 border-amber-500/30 transition-all';
+        icon.innerText = 'C';
+        icon.className = 'w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5';
+        title.innerText = 'Cycle Count & Inventory Audit';
+        title.className = 'text-xs font-bold uppercase tracking-wider text-amber-300';
+        desc.innerText = 'Scan a bin location barcode (e.g. A-01, B-02) to verify physical counts against recorded telemetry.';
+        preview.classList.add('hidden');
+      }
+    }
+
+    /* =====================================================================
+       4. BARCODE PROCESSOR
+       ===================================================================== */
+    function handleScan(rawBarcode) {
+      const code = rawBarcode.trim().toUpperCase();
+      if (!code) return;
+
+      // Is it a known Item SKU?
+      const isSku = SKU_DATABASE[code] !== undefined;
+
+      // Is it a Bin or Location code? (e.g., A-01, LOC-A01)
+      const binMatch = warehouseBins.find(b => b.id.toUpperCase() === code || b.code.toUpperCase() === code);
+
+      if (currentWorkflow === 'putaway') {
+        handlePutawayScan(code, isSku, binMatch);
+      } else if (currentWorkflow === 'picking') {
+        handlePickScan(code, isSku, binMatch);
+      } else if (currentWorkflow === 'cycle_count') {
+        handleCycleCountScan(code, isSku, binMatch);
+      }
+    }
+
+    function handlePutawayScan(code, isSku, binMatch) {
+      if (currentStep === 1) {
+        if (!isSku) {
+          playBeep('error');
+          showFeedback(`Invalid SKU code: "${code}". Please scan an item package barcode first.`, 'error');
+          return;
+        }
+
+        const itemMeta = SKU_DATABASE[code];
+        // Find best optimal slot:
+        // Priority: Same SKU with space > Empty slot in preferred zone > Any empty slot
+        let targetSlot = warehouseBins.find(b => b.sku === code && (b.qty + itemMeta.defaultPack <= b.maxQty));
+        if (!targetSlot) {
+          targetSlot = warehouseBins.find(b => b.zone === itemMeta.preferredZone && !b.sku);
+        }
+        if (!targetSlot) {
+          targetSlot = warehouseBins.find(b => !b.sku);
+        }
+
+        if (!targetSlot) {
+          playBeep('error');
+          showFeedback(`Warehouse capacity full! No suitable bin found for ${code}`, 'error');
+          return;
+        }
+
+        stagedPutawayItem = {
+          sku: code,
+          name: itemMeta.name,
+          suggestedBinId: targetSlot.id,
+          qtyToAdd: itemMeta.defaultPack
+        };
+
+        playBeep('recommend');
+        currentStep = 2;
+        updateGuidanceCard();
+        renderWarehouseGrid();
+        showFeedback(`Scanned ${code}. Optimal destination allocated: Slot ${targetSlot.id}`, 'success');
+
+      } else if (currentStep === 2) {
+        // Expecting location scan
+        if (!binMatch) {
+          playBeep('error');
+          showFeedback(`Step 2 error: "${code}" is not a recognized slot barcode. Scan bin ${stagedPutawayItem.suggestedBinId}`, 'error');
+          return;
+        }
+
+        // Verify if correct bin was scanned (or user put it in an approved empty slot)
+        const targetBin = binMatch;
+        if (targetBin.sku && targetBin.sku !== stagedPutawayItem.sku) {
+          playBeep('error');
+          showFeedback(`Slot ${targetBin.id} already holds ${targetBin.sku}. Must match SKU or be empty.`, 'error');
+          return;
+        }
+
+        // Complete Putaway!
+        targetBin.sku = stagedPutawayItem.sku;
+        targetBin.qty += stagedPutawayItem.qtyToAdd;
+
+        // Log
+        logAuditAction('PUTAWAY', stagedPutawayItem.sku, targetBin.id, `+${stagedPutawayItem.qtyToAdd}`, 'COMPLETED');
+        playBeep('success');
+
+        showFeedback(`Putaway Confirmed! +${stagedPutawayItem.qtyToAdd} units of ${stagedPutawayItem.sku} stored into Bin ${targetBin.id}`, 'success');
+
+        // Reset workflow
+        currentStep = 1;
+        const previousSlot = stagedPutawayItem.suggestedBinId;
+        stagedPutawayItem = null;
+        updateGuidanceCard();
+        renderWarehouseGrid();
+        renderTables();
+        updateGlobalStats();
+      }
+    }
+
+    function handlePickScan(code, isSku, binMatch) {
+      if (binMatch) {
+        // Operator scanned a bin directly to pick from
+        if (!binMatch.sku || binMatch.qty <= 0) {
+          playBeep('error');
+          showFeedback(`Bin ${binMatch.id} is empty! Nothing to retrieve.`, 'error');
+          return;
+        }
+
+        const pickedQty = Math.min(2, binMatch.qty);
+        binMatch.qty -= pickedQty;
+        const pickedSku = binMatch.sku;
+        if (binMatch.qty === 0) {
+          binMatch.sku = null;
+        }
+
+        logAuditAction('PICK', pickedSku, binMatch.id, `-${pickedQty}`, 'COMPLETED');
+        playBeep('success');
+        showFeedback(`Picked ${pickedQty} units of ${pickedSku} from Bin ${binMatch.id}`, 'success');
+        renderWarehouseGrid();
+        renderTables();
+        updateGlobalStats();
+
+      } else if (isSku) {
+        // Scanned SKU: find bin containing it and highlight
+        const candidateBin = warehouseBins.find(b => b.sku === code && b.qty > 0);
+        if (!candidateBin) {
+          playBeep('error');
+          showFeedback(`No inventory available in warehouse for SKU: ${code}`, 'error');
+          return;
+        }
+
+        highlightSlotForPick(candidateBin.id);
+        playBeep('recommend');
+        showFeedback(`Located ${code} in Bin ${candidateBin.id}. Scan bin to confirm withdrawal.`, 'info');
+      } else {
+        playBeep('error');
+        showFeedback(`Unrecognized code: "${code}" for pick pipeline.`, 'error');
+      }
+    }
+
+    function handleCycleCountScan(code, isSku, binMatch) {
+      if (binMatch) {
+        openAuditModal(binMatch.id);
+        playBeep('recommend');
+      } else {
+        playBeep('error');
+        showFeedback(`Please scan a valid bin barcode (e.g. A-01, B-02) for audit.`, 'error');
+      }
+    }
+
+    /* =====================================================================
+       5. PHYSICAL AUDIT / CYCLE COUNT MODAL
+       ===================================================================== */
+    let activeAuditBinId = null;
+
+    function openAuditModal(binId) {
+      const bin = warehouseBins.find(b => b.id === binId);
+      if (!bin) return;
+
+      activeAuditBinId = binId;
+      document.getElementById('audit-modal-bin').innerText = bin.id;
+      document.getElementById('audit-modal-sku').innerText = bin.sku ? `${bin.sku} (${SKU_DATABASE[bin.sku]?.name || 'Unknown'})` : 'Empty Bin';
+      document.getElementById('audit-modal-system-qty').innerText = `${bin.qty} Units`;
+      document.getElementById('audit-modal-actual-input').value = bin.qty;
+
+      const warning = document.getElementById('audit-modal-variance-warning');
+      warning.classList.add('hidden');
+
+      const modal = document.getElementById('cycle-count-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeAuditModal() {
+      const modal = document.getElementById('cycle-count-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      activeAuditBinId = null;
+    }
+
+    function commitCycleCount() {
+      const bin = warehouseBins.find(b => b.id === activeAuditBinId);
+      if (!bin) return;
+
+      const actualQty = parseInt(document.getElementById('audit-modal-actual-input').value, 10);
+      if (isNaN(actualQty) || actualQty < 0) {
+        showFeedback('Please enter a valid non-negative count', 'error');
+        return;
+      }
+
+      const variance = actualQty - bin.qty;
+      const prevQty = bin.qty;
+      bin.qty = actualQty;
+
+      if (variance === 0) {
+        playBeep('success');
+        logAuditAction('CYCLE_COUNT', bin.sku || 'N/A', bin.id, `${actualQty} (Exact)`, 'VERIFIED');
+        showFeedback(`Cycle count verified for Bin ${bin.id}: 100% accurate match!`, 'success');
+      } else {
+        playBeep('error');
+        const sign = variance > 0 ? `+${variance}` : `${variance}`;
+        logAuditAction('CYCLE_COUNT', bin.sku || 'N/A', bin.id, `Var: ${sign}`, 'VARIANCE');
+        showFeedback(`Variance logged for Bin ${bin.id}! System adjusted from ${prevQty} to ${actualQty}.`, 'error');
+      }
+
+      closeAuditModal();
+      renderWarehouseGrid();
+      renderTables();
+      updateGlobalStats();
+    }
+
+    /* =====================================================================
+       6. WAREHOUSE MAP VISUALIZER RENDERING
+       ===================================================================== */
+    function renderWarehouseGrid() {
+      const container = document.getElementById('warehouse-grid-container');
+      container.innerHTML = '';
+
+      const filteredBins = warehouseBins.filter(b => activeFilterZone === 'ALL' || b.zone === activeFilterZone);
+
+      filteredBins.forEach(bin => {
+        const percent = Math.round((bin.qty / bin.maxQty) * 100);
+        let statusColor = 'border-slate-800 bg-slate-900/90';
+        let barColor = 'bg-emerald-500';
+        let badgeColor = 'text-slate-400 bg-slate-800';
+        let statusLabel = 'Empty';
+
+        if (bin.qty === 0) {
+          statusLabel = 'Empty';
+          barColor = 'bg-slate-700';
+        } else if (percent > 85) {
+          statusLabel = 'Full';
+          barColor = 'bg-rose-500';
+          badgeColor = 'text-rose-400 bg-rose-500/10 border border-rose-500/20';
+        } else {
+          statusLabel = 'Occupied';
+          barColor = 'bg-amber-500';
+          badgeColor = 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
+        }
+
+        // Suggested slot highlight during putaway
+        const isSuggested = stagedPutawayItem && stagedPutawayItem.suggestedBinId === bin.id;
+        const isTargetedPick = stagedPickItem && stagedPickItem.binId === bin.id;
+
+        let borderClass = 'border-slate-800 hover:border-blue-500';
+        let pulseClass = '';
+
+        if (isSuggested) {
+          borderClass = 'border-emerald-500 ring-2 ring-emerald-500/50';
+          pulseClass = 'slot-highlight';
+        } else if (isTargetedPick) {
+          borderClass = 'border-purple-500 ring-2 ring-purple-500/50';
+          pulseClass = 'slot-highlight';
+        }
+
+        const slotCard = document.createElement('div');
+        slotCard.className = `relative p-3.5 rounded-xl border ${borderClass} bg-slate-900 transition-all cursor-pointer select-none group ${pulseClass}`;
+        slotCard.onclick = () => selectWarehouseSlot(bin.id);
+
+        slotCard.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-mono font-black text-sm text-white group-hover:text-blue-400 transition">${bin.id}</span>
+            <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${badgeColor}">${statusLabel}</span>
+          </div>
+
+          <div class="my-2">
+            <div class="text-[11px] font-semibold text-slate-200 truncate" title="${bin.sku || 'Available'}">
+              ${bin.sku ? bin.sku : '<span class="text-slate-600 font-normal italic">Open Slot</span>'}
+            </div>
+            <div class="text-[10px] text-slate-400 truncate">
+              ${bin.sku ? (SKU_DATABASE[bin.sku]?.name || 'Item') : 'Ready for storage'}
+            </div>
+          </div>
+
+          <!-- Capacity Bar -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[10px] font-mono text-slate-400">
+              <span>${bin.qty}/${bin.maxQty} u</span>
+              <span>${percent}%</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${percent}%"></div>
+            </div>
+          </div>
+
+          ${isSuggested ? `
+            <div class="absolute -top-2 -right-2 bg-emerald-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shadow">
+              RECOMMENDED
+            </div>
+          ` : ''}
+        `;
+
+        container.appendChild(slotCard);
+      });
+    }
+
+    function filterWarehouseZone(zone) {
+      activeFilterZone = zone;
+      ['ALL', 'A', 'B', 'C'].forEach(z => {
+        const btn = document.getElementById(`zone-pill-${z}`);
+        if (z === zone) {
+          btn.className = 'px-2.5 py-1 rounded-lg font-medium bg-blue-600 text-white';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg font-medium text-slate-400 hover:text-white';
+        }
+      });
+      renderWarehouseGrid();
+    }
+
+    function selectWarehouseSlot(binId) {
+      selectedSlotId = binId;
+      const bin = warehouseBins.find(b => b.id === binId);
+      if (!bin) return;
+
+      const drawer = document.getElementById('slot-drawer');
+      drawer.classList.remove('hidden');
+
+      document.getElementById('drawer-slot-badge').innerText = bin.id;
+      document.getElementById('drawer-slot-title').innerText = `${bin.zoneName} (${bin.id})`;
+      document.getElementById('drawer-slot-code').innerText = bin.code;
+      document.getElementById('drawer-slot-qty').innerText = `${bin.qty} / ${bin.maxQty} units`;
+      document.getElementById('drawer-slot-cat').innerText = bin.sku ? (SKU_DATABASE[bin.sku]?.category || 'General') : 'Empty';
+      document.getElementById('drawer-slot-sku').innerText = bin.sku ? `${bin.sku} • ${SKU_DATABASE[bin.sku]?.name}` : 'No SKU currently assigned to this bin';
+
+      const statusBadge = document.getElementById('drawer-slot-status');
+      if (bin.qty === 0) {
+        statusBadge.innerText = 'Empty';
+        statusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium';
+      } else if (bin.qty >= bin.maxQty) {
+        statusBadge.innerText = 'Full';
+        statusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium';
+      } else {
+        statusBadge.innerText = 'Partially Filled';
+        statusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium';
+      }
+    }
+
+    function closeSlotDrawer() {
+      document.getElementById('slot-drawer').classList.add('hidden');
+      selectedSlotId = null;
+    }
+
+    function triggerQuickPutawayFromDrawer() {
+      if (!selectedSlotId) return;
+      simulateScan(selectedSlotId);
+    }
+
+    function triggerQuickPickFromDrawer() {
+      if (!selectedSlotId) return;
+      const bin = warehouseBins.find(b => b.id === selectedSlotId);
+      if (!bin || !bin.sku) {
+        showFeedback('Slot is empty. Nothing to pick.', 'error');
+        playBeep('error');
+        return;
+      }
+      setWorkflowMode('picking');
+      simulateScan(bin.id);
+    }
+
+    function highlightSlotForPick(binId) {
+      stagedPickItem = { binId: binId };
+      renderWarehouseGrid();
+      selectWarehouseSlot(binId);
+    }
+
+    /* =====================================================================
+       7. INVENTORY TABLE & AUDIT LOG TABLES
+       ===================================================================== */
+    function renderTables(searchTerm = '') {
+      const invBody = document.getElementById('inventory-table-body');
+      invBody.innerHTML = '';
+
+      const search = searchTerm.toLowerCase();
+
+      // Inventory Master Rows
+      warehouseBins
+        .filter(b => b.sku !== null)
+        .filter(b => {
+          if (!search) return true;
+          const meta = SKU_DATABASE[b.sku];
+          return b.id.toLowerCase().includes(search) ||
+                 b.sku.toLowerCase().includes(search) ||
+                 (meta && meta.name.toLowerCase().includes(search)) ||
+                 (meta && meta.category.toLowerCase().includes(search));
+        })
+        .forEach(b => {
+          const meta = SKU_DATABASE[b.sku] || { name: 'Item', category: 'General' };
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-850/60 transition';
+          tr.innerHTML = `
+            <td class="py-2.5 px-4 font-mono font-bold text-blue-400">
+              ${b.sku}
+              <span class="block font-sans text-[11px] font-normal text-slate-400">${meta.name}</span>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold">${b.id}</span>
+            </td>
+            <td class="py-2.5 px-3 text-slate-300">${meta.category}</td>
+            <td class="py-2.5 px-3 font-semibold text-white">${b.qty} units</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${b.qty > 35 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}">
+                In Stock
+              </span>
+            </td>
+            <td class="py-2.5 px-4 text-right">
+              <button onclick="simulateScan('${b.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold">
+                Scan Bin
+              </button>
+            </td>
+          `;
+          invBody.appendChild(tr);
+        });
+
+      // Audit Log Rows
+      const auditBody = document.getElementById('audit-table-body');
+      auditBody.innerHTML = '';
+
+      auditLogs.slice(0, 15).forEach(log => {
+        let badgeColor = 'bg-blue-500/20 text-blue-300';
+        if (log.action === 'PICK') badgeColor = 'bg-purple-500/20 text-purple-300';
+        if (log.action === 'CYCLE_COUNT') badgeColor = 'bg-amber-500/20 text-amber-300';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-850/60 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 text-slate-400">${log.timestamp}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}">${log.action}</span>
+          </td>
+          <td class="py-2.5 px-3 text-white font-bold">${log.sku}</td>
+          <td class="py-2.5 px-3 text-blue-400">${log.bin}</td>
+          <td class="py-2.5 px-3 text-slate-200">${log.qty}</td>
+          <td class="py-2.5 px-4">
+            <span class="text-[10px] font-bold ${log.status === 'VARIANCE' ? 'text-rose-400' : 'text-emerald-400'}">${log.status}</span>
+          </td>
+        `;
+        auditBody.appendChild(tr);
+      });
+    }
+
+    function logAuditAction(action, sku, bin, qty, status) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      auditLogs.unshift({
+        timestamp: timeStr,
+        action: action,
+        sku: sku,
+        bin: bin,
+        qty: qty,
+        status: status
+      });
+      renderTables();
+    }
+
+    function switchTab(tab) {
+      const invBtn = document.getElementById('tab-btn-inventory');
+      const auditBtn = document.getElementById('tab-btn-audit');
+      const invContent = document.getElementById('tab-content-inventory');
+      const auditContent = document.getElementById('tab-content-audit');
+
+      if (tab === 'inventory') {
+        invBtn.className = 'pb-2.5 px-3 text-xs font-bold border-b-2 border-blue-500 text-white flex items-center gap-1.5';
+        auditBtn.className = 'pb-2.5 px-3 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5';
+        invContent.classList.remove('hidden');
+        auditContent.classList.add('hidden');
+      } else {
+        auditBtn.className = 'pb-2.5 px-3 text-xs font-bold border-b-2 border-blue-500 text-white flex items-center gap-1.5';
+        invBtn.className = 'pb-2.5 px-3 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5';
+        auditContent.classList.remove('hidden');
+        invContent.classList.add('hidden');
+      }
+    }
+
+    function handleTableSearch(val) {
+      renderTables(val);
+    }
+
+    /* =====================================================================
+       8. GLOBAL METRICS UPDATE
+       ===================================================================== */
+    function updateGlobalStats() {
+      let totalUnits = 0;
+      let totalCapacity = 0;
+
+      warehouseBins.forEach(b => {
+        totalUnits += b.qty;
+        totalCapacity += b.maxQty;
+      });
+
+      const util = Math.round((totalUnits / totalCapacity) * 100);
+
+      document.getElementById('stat-total-units').innerText = totalUnits.toLocaleString();
+      document.getElementById('stat-utilization').innerText = `${util}%`;
+      document.getElementById('stat-utilization-bar').style.width = `${util}%`;
+    }
+
+    /* =====================================================================
+       9. REAL CAMERA SCANNER INTEGRATION (html5-qrcode)
+       ===================================================================== */
+    function toggleCameraScanner() {
+      const wrapper = document.getElementById('camera-reader-wrapper');
+      const btnText = document.getElementById('camera-btn-text');
+
+      if (cameraActive) {
+        // Stop Camera
+        if (html5QrScannerInstance) {
+          html5QrScannerInstance.stop().then(() => {
+            html5QrScannerInstance.clear();
+            wrapper.classList.add('hidden');
+            btnText.innerText = 'Open Cam';
+            cameraActive = false;
+          }).catch(err => console.error('Failed to stop camera scanner', err));
+        }
+      } else {
+        // Open Camera
+        wrapper.classList.remove('hidden');
+        btnText.innerText = 'Stop Cam';
+        cameraActive = true;
+
+        html5QrScannerInstance = new Html5Qrcode("interactive-reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrScannerInstance.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            // Success QR/Barcode Callback
+            handleScan(decodedText);
+          },
+          (errorMessage) => {
+            // Continuous scanning frame - no error logging needed
+          }
+        ).catch(err => {
+          showFeedback('Camera access denied or unavailable in current preview frame.', 'error');
+          wrapper.classList.add('hidden');
+          btnText.innerText = 'Open Cam';
+          cameraActive = false;
+        });
+      }
+    }
+
+    /* =====================================================================
+       10. INPUT & DEMO HELPERS
+       ===================================================================== */
+    function simulateScan(code) {
+      const input = document.getElementById('manual-scan-input');
+      input.value = code;
+      handleScan(code);
+    }
+
+    function handleManualKey(event) {
+      if (event.key === 'Enter') {
+        processEnteredBarcode();
+      }
+    }
+
+    function processEnteredBarcode() {
+      const input = document.getElementById('manual-scan-input');
+      const val = input.value;
+      if (val) {
+        handleScan(val);
+        input.value = '';
+      }
+    }
+
+    function showFeedback(message, type = 'info') {
+      const box = document.getElementById('scan-feedback');
+      box.classList.remove('hidden', 'bg-emerald-950/40', 'border-emerald-500/40', 'text-emerald-300', 'bg-rose-950/40', 'border-rose-500/40', 'text-rose-300', 'bg-blue-950/40', 'border-blue-500/40', 'text-blue-300');
+
+      let icon = '<i class="ph-bold ph-info text-base"></i>';
+      if (type === 'success') {
+        box.classList.add('bg-emerald-950/40', 'border-emerald-500/40', 'text-emerald-300');
+        icon = '<i class="ph-bold ph-check-circle text-base text-emerald-400"></i>';
+      } else if (type === 'error') {
+        box.classList.add('bg-rose-950/40', 'border-rose-500/40', 'text-rose-300');
+        icon = '<i class="ph-bold ph-warning-circle text-base text-rose-400"></i>';
+      } else {
+        box.classList.add('bg-blue-950/40', 'border-blue-500/40', 'text-blue-300');
+      }
+
+      box.innerHTML = `${icon} <span>${message}</span>`;
+    }
+
+    /* Window load bootstrap */
+    window.onload = function () {
+      renderWarehouseGrid();
+      renderTables();
+      updateGlobalStats();
+      updateGuidanceCard();
+    };
+  </script>
+</body>
+</html>
